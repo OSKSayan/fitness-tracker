@@ -116,7 +116,7 @@ textarea {
   min-height: 100vh;
 }
 .main {
-  max-width: 980px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 16px 16px calc(96px + env(safe-area-inset-bottom));
 }
@@ -979,4 +979,226 @@ input[aria-invalid='true'] {
 
 .inline-select input[type='time'] {
   max-width: 140px;
+}
+
+/* ---------- Упрощённый интерфейс ---------- */
+.spacer {
+  flex: 1;
+}
+.grow {
+  flex: 1;
+}
+.center {
+  text-align: center;
+}
+.block {
+  display: block;
+}
+.start {
+  align-self: flex-start;
+}
+.btn-big {
+  min-height: 56px;
+  font-size: 1.1rem;
+  border-radius: 14px;
+}
+.muted-link {
+  color: var(--muted);
+  font-weight: 500;
+}
+.link.danger {
+  color: var(--danger);
+}
+.card-accent {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+.card-ok {
+  background: var(--ok-bg);
+  border-color: var(--ok);
+}
+.tip {
+  font-size: 0.92rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.page-head .date-nav h1 {
+  flex: 1;
+  text-align: center;
+}
+.page-head .date-nav {
+  flex-wrap: nowrap;
+}
+.page-head > .muted {
+  text-align: center;
+}
+.food-list,
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.food-row,
+.history-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 4px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+li:first-child > .food-row,
+li:first-child > .history-row {
+  border-top: 0;
+}
+.food-row:hover,
+.history-row:hover {
+  background: var(--surface-2);
+}
+.list > li:not(.list-item) {
+  list-style: none;
+}
+.workout-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.exercise-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.exercise-head {
+  align-items: center;
+}
+.set-row .muted {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.feelings {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.feeling {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 60px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.72rem;
+  padding: 6px 2px;
+}
+.feeling span {
+  font-size: 1.5rem;
+}
+.feeling-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+input.mini-input {
+  width: 64px !important;
+  min-height: 38px !important;
+  text-align: center;
+}
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.section > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 16px;
+  font-weight: 600;
+  font-size: 1.05rem;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 56px;
+}
+.section > summary::-webkit-details-marker {
+  display: none;
+}
+.section > summary::after {
+  content: '›';
+  margin-left: auto;
+  font-size: 1.4rem;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+.section[open] > summary::after {
+  transform: rotate(90deg);
+}
+.section-body {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 0;
+}
+.sync-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 4px 12px;
+  min-height: 32px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+.sync-signed-out {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+.sync-error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.sticky-actions {
+  bottom: calc(70px + env(safe-area-inset-bottom));
+  z-index: 5;
+  margin: 0 -16px;
+  padding: 10px 16px;
+}
+.modal .sticky-actions {
+  bottom: 0;
+}
+@media (min-width: 900px) {
+  .sticky-actions {
+    bottom: 0;
+  }
 }

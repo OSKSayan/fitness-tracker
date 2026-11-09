@@ -8,6 +8,8 @@ const MODE_KEY = 'fitness-tracker:mode';
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
+/** Слушатели локальных изменений (для синхронизации с облаком). */
+const changeListeners = new Set<Listener>();
 
 let demo = safeGet(MODE_KEY) === 'demo';
 let data: AppData = load();
@@ -47,6 +49,11 @@ export function normalize(raw: unknown): AppData {
   };
 }
 
+/** Есть ли в данных пользовательские записи (а не только настройки по умолчанию). */
+export function hasRecords(d: AppData) {
+  return d.workouts.length > 0 || d.food.length > 0 || d.body.length > 0 || Object.keys(d.daily).length > 0;
+}
+
 function load(): AppData {
   const raw = safeGet(demo ? DEMO_KEY : KEY);
   if (!raw) return demo ? createDemoData() : createDefaultData();
@@ -74,16 +81,27 @@ export function getData() {
   return data;
 }
 
+/** Изменение пользователем: сохраняется локально и отправляется в облако. */
 export function update(fn: (d: AppData) => AppData) {
   data = fn(data);
   persist();
   emit();
+  if (!demo) changeListeners.forEach((l) => l());
 }
 
-export function replaceData(next: AppData) {
+/** Полная замена данных. fromRemote — данные пришли из облака, обратно не отправляем. */
+export function replaceData(next: AppData, opts: { fromRemote?: boolean } = {}) {
   data = next;
   persist();
   emit();
+  if (!demo && !opts.fromRemote) changeListeners.forEach((l) => l());
+}
+
+export function onLocalChange(l: Listener) {
+  changeListeners.add(l);
+  return () => {
+    changeListeners.delete(l);
+  };
 }
 
 export function isDemo() {
@@ -111,9 +129,11 @@ export function setDemo(on: boolean) {
   emit();
 }
 
-function subscribe(l: Listener) {
+export function subscribe(l: Listener) {
   listeners.add(l);
-  return () => listeners.delete(l);
+  return () => {
+    listeners.delete(l);
+  };
 }
 
 export function useData(): AppData {
