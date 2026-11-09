@@ -8,6 +8,7 @@ import { patchSettings } from '../actions';
 import { notificationState, REMINDER_LABELS, requestNotifications, type NotifState } from '../reminders';
 import { ConfirmDialog, DayPicker, Field, Notice } from '../components/ui';
 import { Account } from '../components/Account';
+import { InstallHelp } from '../components/InstallHelp';
 import { PlanEditor } from '../components/PlanEditor';
 import { useSync } from '../sync';
 import { DISCLAIMER } from '../components/MedicalNotes';
@@ -70,6 +71,10 @@ export function Settings({ section }: { section?: string }) {
       </header>
 
       <div className="sections">
+        <Section icon="📲" title="Установить на телефон" open={section === 'install'}>
+          <InstallHelp />
+        </Section>
+
         <Section icon="☁️" title="Аккаунт и облако" open={!section || section === 'account'}>
           <Account />
         </Section>

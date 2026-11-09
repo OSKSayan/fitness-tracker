@@ -10,6 +10,7 @@ import { Card, Field, Modal, Progress } from '../components/ui';
 import { DoctorNotice } from '../components/MedicalNotes';
 import { FoodForm, newFood, QUICK_FOOD } from '../components/FoodForm';
 import type { Go } from '../App';
+import { isStandalone } from '../install';
 
 const TIPS = [
   'Гарнир — примерно вдвое меньше обычной порции.',
@@ -62,6 +63,7 @@ export function Today({ go, action, clearAction }: { go: Go; action?: string; cl
         </p>
       </header>
 
+      {isToday && <InstallBanner go={go} />}
       {isToday && <DoctorNotice />}
       {isToday && <WorkoutCard go={go} />}
 
@@ -259,5 +261,40 @@ function WeightCard({ date, go }: { date: string; go: Go }) {
         </button>
       </div>
     </Card>
+  );
+}
+
+const INSTALL_KEY = 'fitness-tracker:install-banner-hidden';
+
+function InstallBanner({ go }: { go: Go }) {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return isStandalone() || localStorage.getItem(INSTALL_KEY) === '1';
+    } catch {
+      return isStandalone();
+    }
+  });
+  if (hidden) return null;
+  const hide = () => {
+    try {
+      localStorage.setItem(INSTALL_KEY, '1');
+    } catch {
+      /* ignore */
+    }
+    setHidden(true);
+  };
+  return (
+    <div className="install-banner">
+      <button type="button" className="install-main" onClick={() => go('settings', 'install')}>
+        <span aria-hidden>📲</span>
+        <span>
+          <strong>Установите как приложение</strong>
+          <span className="muted small block">Иконка на главном экране, работает без интернета</span>
+        </span>
+      </button>
+      <button type="button" className="icon-btn" aria-label="Скрыть" onClick={hide}>
+        ×
+      </button>
+    </div>
   );
 }

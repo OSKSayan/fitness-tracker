@@ -1202,3 +1202,34 @@ input.mini-input {
     bottom: 0;
   }
 }
+.install-banner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 4px 4px 4px 0;
+}
+.install-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+  min-height: 56px;
+}
+.install-main > span:first-child {
+  font-size: 1.6rem;
+}
+.steps {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
