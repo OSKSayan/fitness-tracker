@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { AppData, Goals, Reminder } from '../types';
 import { normalize, replaceData, setDemo, update, useData, useDemo } from '../store';
 import { createDefaultData } from '../defaults';
@@ -6,7 +6,10 @@ import { todayISO } from '../dates';
 import { fmt, parseNum } from '../units';
 import { patchSettings } from '../actions';
 import { notificationState, REMINDER_LABELS, requestNotifications, type NotifState } from '../reminders';
-import { Card, ConfirmDialog, DayPicker, Field, Notice } from '../components/ui';
+import { ConfirmDialog, DayPicker, Field, Notice } from '../components/ui';
+import { Account } from '../components/Account';
+import { PlanEditor } from '../components/PlanEditor';
+import { useSync } from '../sync';
 import { DISCLAIMER } from '../components/MedicalNotes';
 
 const NOTIF_TEXT: Record<NotifState, string> = {
@@ -17,7 +20,8 @@ const NOTIF_TEXT: Record<NotifState, string> = {
     'Уведомления запрещены в настройках браузера. Чтобы включить их, разрешите уведомления для этого сайта в настройках браузера (значок замка в адресной строке). Пока что напоминания будут показываться внутри приложения.',
 };
 
-export function Settings() {
+export function Settings({ section }: { section?: string }) {
+  const sync = useSync();
   const data = useData();
   const demo = useDemo();
   const s = data.settings;
@@ -62,142 +66,144 @@ export function Settings() {
   return (
     <div className="page">
       <header className="page-head">
-        <h1>Напоминания и настройки</h1>
+        <h1>Настройки</h1>
       </header>
 
-      <Card title="Напоминания">
-        <Notice tone="info">
-          Напоминания работают, <strong>пока приложение открыто</strong> во вкладке браузера (в том числе в фоне). Когда вкладка закрыта,
-          уведомления не приходят — это ограничение браузера без серверной части. Внутри приложения напоминание появится при следующем открытии.
-        </Notice>
-        <div className="setting-row">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={s.notificationsWanted}
-              disabled={notif === 'unsupported'}
-              onChange={async (e) => {
-                const on = e.target.checked;
-                patchSettings({ notificationsWanted: on });
-                if (on && notificationState() === 'default') setNotif(await requestNotifications());
-              }}
-            />
-            Показывать системные уведомления браузера
-          </label>
-          <p className={notif === 'denied' ? 'field-error' : 'field-hint'}>{NOTIF_TEXT[notif]}</p>
-          {notif === 'default' && (
-            <button type="button" className="btn btn-small" onClick={async () => setNotif(await requestNotifications())}>
-              Запросить разрешение
-            </button>
-          )}
-          {notif === 'granted' && s.notificationsWanted && (
-            <button type="button" className="btn btn-small btn-ghost" onClick={() => new Notification('Проверка', { body: 'Так будут выглядеть напоминания.' })}>
-              Проверить уведомление
-            </button>
-          )}
-        </div>
-        <ul className="list">
-          {data.reminders.map((r) => {
-            const l = REMINDER_LABELS[r.type];
-            return (
-              <li key={r.id} className="list-item">
-                <div className="list-main">
-                  <label className="check">
-                    <input type="checkbox" checked={r.enabled} onChange={(e) => patchReminder(r.id, { enabled: e.target.checked })} />
-                    <span>
-                      {l.icon} <strong>{l.title}</strong>
-                    </span>
-                  </label>
-                  <label className="inline-select">
-                    <span className="sr-only">Время напоминания «{l.title}»</span>
-                    <input type="time" value={r.time} disabled={!r.enabled} onChange={(e) => e.target.value && patchReminder(r.id, { time: e.target.value })} />
-                  </label>
-                </div>
-                {r.enabled && (
-                  <>
-                    <DayPicker label={`Дни напоминания «${l.title}»`} value={r.days} onChange={(v) => patchReminder(r.id, { days: v })} />
-                    {r.days.length === 0 && <p className="field-error">Выберите хотя бы один день</p>}
-                  </>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
+      <div className="sections">
+        <Section icon="☁️" title="Аккаунт и облако" open={!section || section === 'account'}>
+          <Account />
+        </Section>
 
-      <GoalsCard goals={s.goals} weightUnit={s.weightUnit} />
-
-      <Card title="Единицы измерения">
-        <div className="two">
-          <Field label="Вес">
-            {(p) => (
-              <select {...p} value={s.weightUnit} onChange={(e) => patchSettings({ weightUnit: e.target.value as 'kg' | 'lb' })}>
-                <option value="kg">Килограммы (кг)</option>
-                <option value="lb">Фунты (lb)</option>
-              </select>
-            )}
+        <Section icon="🏋️" title="Дни тренировок и упражнения" open={section === 'plan'}>
+          <Field label="Дата начала занятий" hint="От неё считаются недели и режим лёгких весов">
+            {(p) => <input {...p} type="date" value={s.startDate} onChange={(e) => e.target.value && patchSettings({ startDate: e.target.value })} />}
           </Field>
-          <Field label="Замеры">
-            {(p) => (
-              <select {...p} value={s.lengthUnit} onChange={(e) => patchSettings({ lengthUnit: e.target.value as 'cm' | 'in' })}>
-                <option value="cm">Сантиметры (см)</option>
-                <option value="in">Дюймы (in)</option>
-              </select>
-            )}
-          </Field>
-        </div>
-        <p className="muted small">Данные хранятся в кг и см и пересчитываются при показе — смена единиц ничего не портит.</p>
-      </Card>
+          <p className="label">Дни тренировок</p>
+          <DayPicker label="Дни тренировок" value={s.workoutDays} onChange={(v) => patchSettings({ workoutDays: v })} />
+          {s.workoutDays.length !== 3 && <p className="field-hint">По плану — 3 дня в неделю, сейчас выбрано {s.workoutDays.length}.</p>}
+          <p className="label">Упражнения</p>
+          <PlanEditor />
+        </Section>
 
-      <Card title="Данные и резервная копия">
-        <p className="muted">
-          Все данные хранятся только в этом браузере (localStorage) на этом устройстве. Регистрации и сервера нет. Делайте экспорт, чтобы не
-          потерять записи при очистке браузера или переносе на другое устройство.
-        </p>
-        <div className="row-actions start">
-          <button type="button" className="btn btn-primary" onClick={exportJson}>
-            Экспорт в JSON
-          </button>
-          <label className="btn">
-            Импорт из JSON
-            <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
-          </label>
-          <button type="button" className="btn btn-ghost danger" onClick={() => setConfirm('wipe')}>
+        <Section icon="🔔" title="Напоминания">
+          <p className="muted small">
+            Срабатывают, пока приложение открыто (вкладка может быть в фоне). Когда вкладка закрыта, браузер уведомления не присылает — напоминание
+            появится внутри приложения, когда вы его откроете.
+          </p>
+          <ul className="list">
+            {data.reminders.map((r) => {
+              const l = REMINDER_LABELS[r.type];
+              return (
+                <li key={r.id} className="list-item">
+                  <div className="list-main">
+                    <label className="check">
+                      <input type="checkbox" checked={r.enabled} onChange={(e) => patchReminder(r.id, { enabled: e.target.checked })} />
+                      <span>
+                        {l.icon} {l.title}
+                      </span>
+                    </label>
+                    {r.enabled && (
+                      <label className="inline-select">
+                        <span className="sr-only">Время напоминания «{l.title}»</span>
+                        <input type="time" value={r.time} onChange={(e) => e.target.value && patchReminder(r.id, { time: e.target.value })} />
+                      </label>
+                    )}
+                  </div>
+                  {r.enabled && <DayPicker label={`Дни напоминания «${l.title}»`} value={r.days} onChange={(v) => patchReminder(r.id, { days: v })} />}
+                  {r.enabled && r.days.length === 0 && <p className="field-error">Выберите хотя бы один день</p>}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="setting-row">
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={s.notificationsWanted}
+                disabled={notif === 'unsupported'}
+                onChange={async (e) => {
+                  const on = e.target.checked;
+                  patchSettings({ notificationsWanted: on });
+                  if (on && notificationState() === 'default') setNotif(await requestNotifications());
+                }}
+              />
+              Ещё и системные уведомления браузера
+            </label>
+            {(s.notificationsWanted || notif === 'unsupported') && (
+              <p className={notif === 'denied' ? 'field-error' : 'field-hint'}>{NOTIF_TEXT[notif]}</p>
+            )}
+            {s.notificationsWanted && notif === 'default' && (
+              <button type="button" className="btn btn-small" onClick={async () => setNotif(await requestNotifications())}>
+                Разрешить уведомления
+              </button>
+            )}
+          </div>
+        </Section>
+
+        <Section icon="🎯" title="Ориентиры: калории, белок, вода, шаги">
+          <GoalsForm goals={s.goals} weightUnit={s.weightUnit} />
+        </Section>
+
+        <Section icon="📏" title="Единицы измерения">
+          <div className="two">
+            <Field label="Вес">
+              {(p) => (
+                <select {...p} value={s.weightUnit} onChange={(e) => patchSettings({ weightUnit: e.target.value as 'kg' | 'lb' })}>
+                  <option value="kg">кг</option>
+                  <option value="lb">фунты</option>
+                </select>
+              )}
+            </Field>
+            <Field label="Замеры">
+              {(p) => (
+                <select {...p} value={s.lengthUnit} onChange={(e) => patchSettings({ lengthUnit: e.target.value as 'cm' | 'in' })}>
+                  <option value="cm">см</option>
+                  <option value="in">дюймы</option>
+                </select>
+              )}
+            </Field>
+          </div>
+        </Section>
+
+        <Section icon="💾" title="Резервная копия">
+          <p className="muted small">Файл JSON со всеми записями — на всякий случай или для переноса.</p>
+          <div className="row-actions start">
+            <button type="button" className="btn" onClick={exportJson}>
+              Скачать копию
+            </button>
+            <label className="btn">
+              Загрузить из файла
+              <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
+            </label>
+          </div>
+          {importMsg && (
+            <Notice tone={importMsg.tone} onClose={() => setImportMsg(null)}>
+              {importMsg.text}
+            </Notice>
+          )}
+          <button type="button" className="link danger start" onClick={() => setConfirm('wipe')}>
             Удалить все данные
           </button>
-        </div>
-        {importMsg && (
-          <Notice tone={importMsg.tone} onClose={() => setImportMsg(null)}>
-            {importMsg.text}
-          </Notice>
-        )}
-      </Card>
+        </Section>
 
-      <Card title="Демонстрационный режим">
-        <p className="muted">
-          Показывает приложение с примером данных. Пример хранится отдельно и не попадает в ваш журнал; при выключении режима вы вернётесь к своим
-          данным.
-        </p>
-        <label className="check">
-          <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} />
-          Включить демо-режим
-        </label>
-      </Card>
+        <Section icon="👀" title="Демо-режим">
+          <p className="muted small">Посмотреть приложение с примером данных. Ваши записи не затрагиваются.</p>
+          <label className="check">
+            <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} />
+            Включить демо-режим
+          </label>
+        </Section>
+      </div>
 
-      <Card title="О приложении" className="soft">
-        <p className="small">{DISCLAIMER}</p>
-        <p className="small muted">
-          При необычных симптомах или ухудшении самочувствия прекратите нагрузку и обратитесь за медицинской помощью.
-        </p>
-      </Card>
+      <p className="muted small center">{DISCLAIMER} При необычных симптомах или ухудшении самочувствия прекратите нагрузку и обратитесь за медицинской помощью.</p>
 
       <ConfirmDialog
         open={confirm === 'import'}
         title="Заменить данные?"
-        confirmLabel="Импортировать"
+        confirmLabel="Загрузить"
         text={
           pendingImport
-            ? `Текущие данные${demo ? ' демо-режима' : ''} будут заменены данными из файла: тренировок — ${pendingImport.workouts.length}, записей питания — ${pendingImport.food.length}, записей веса и замеров — ${pendingImport.body.length}. Рекомендуем сначала сделать экспорт.`
+            ? `Текущие данные будут заменены данными из файла: тренировок — ${pendingImport.workouts.length}, записей еды — ${pendingImport.food.length}, записей веса — ${pendingImport.body.length}.`
             : ''
         }
         onCancel={() => {
@@ -208,13 +214,13 @@ export function Settings() {
           if (pendingImport) replaceData(pendingImport);
           setConfirm(null);
           setPendingImport(null);
-          setImportMsg({ tone: 'ok', text: 'Данные импортированы.' });
+          setImportMsg({ tone: 'ok', text: 'Данные загружены.' });
         }}
       />
       <ConfirmDialog
         open={confirm === 'wipe'}
         title="Удалить все данные?"
-        text="Будут удалены все тренировки, питание, вес, замеры и настройки. Это действие нельзя отменить. Сделайте экспорт, если хотите сохранить копию."
+        text={`Будут удалены все тренировки, еда, вес и настройки${sync.email ? ' — и на этом устройстве, и в облаке' : ''}. Это нельзя отменить.`}
         confirmLabel="Удалить всё"
         onCancel={() => setConfirm(null)}
         onConfirm={() => {
@@ -223,6 +229,17 @@ export function Settings() {
         }}
       />
     </div>
+  );
+}
+
+function Section({ icon, title, open, children }: { icon: string; title: string; open?: boolean; children: ReactNode }) {
+  return (
+    <details className="section" open={open}>
+      <summary>
+        <span aria-hidden>{icon}</span> {title}
+      </summary>
+      <div className="section-body">{children}</div>
+    </details>
   );
 }
 
@@ -238,7 +255,7 @@ const GOAL_FIELDS: { key: keyof Goals; label: string; scale?: number; min: numbe
   { key: 'weeklyLossKg', label: 'Ориентир темпа, кг в неделю', min: 0, max: 1.5 },
 ];
 
-function GoalsCard({ goals, weightUnit }: { goals: Goals; weightUnit: 'kg' | 'lb' }) {
+function GoalsForm({ goals, weightUnit }: { goals: Goals; weightUnit: 'kg' | 'lb' }) {
   const init = () => Object.fromEntries(GOAL_FIELDS.map((f) => [f.key, String(goals[f.key] / (f.scale ?? 1))])) as Record<keyof Goals, string>;
   const [vals, setVals] = useState(init);
   const [err, setErr] = useState<Partial<Record<keyof Goals, string>>>({});
@@ -268,7 +285,7 @@ function GoalsCard({ goals, weightUnit }: { goals: Goals; weightUnit: 'kg' | 'lb
   };
 
   return (
-    <Card title="Цели и ориентиры">
+    <div className="stack">
       <p className="muted small">
         Ориентиры для самоконтроля, а не медицинские нормы. Приложение не рассчитывает дефицит калорий — значения задаёте вы.
         {weightUnit === 'lb' && ' Темп указывается в килограммах.'}
@@ -300,6 +317,6 @@ function GoalsCard({ goals, weightUnit }: { goals: Goals; weightUnit: 'kg' | 'lb
           По умолчанию: {fmt(2200, 0)}–{fmt(2400, 0)} ккал, 150–170 г белка, 2–3 л воды, {fmt(8000, 0)}–{fmt(10000, 0)} шагов, около 0,5 кг в неделю.
         </p>
       </form>
-    </Card>
+    </div>
   );
 }

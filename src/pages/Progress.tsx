@@ -5,7 +5,7 @@ import { addDays, diffDays, formatDate, todayISO } from '../dates';
 import { fmt, fmtL, fmtW, lIn, lOut, lUnit, parseNum, wIn, wOut, wUnit } from '../units';
 import { uid } from '../defaults';
 import { deleteBody, saveBody } from '../actions';
-import { Card, ConfirmDialog, Empty, Field, Modal, Notice } from '../components/ui';
+import { Card, Empty, Field, Modal, Notice } from '../components/ui';
 import { LineChart, linearTrend, type Point } from '../components/LineChart';
 
 type Metric = 'waist' | 'belly' | 'chest' | 'hips';
@@ -29,7 +29,7 @@ export function Progress({ action, clearAction }: { action?: string; clearAction
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['id']>('90');
   const [metric, setMetric] = useState<Metric>('waist');
   const [editing, setEditing] = useState<BodyEntry | null>(null);
-  const [toDelete, setToDelete] = useState<BodyEntry | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (action === 'add') {
@@ -44,6 +44,7 @@ export function Progress({ action, clearAction }: { action?: string; clearAction
 
   const allWeights: Point[] = sorted.filter((b) => b.weight != null).map((b) => ({ date: b.date, value: wOut(s, b.weight!) }));
   const weights = allWeights.filter((x) => x.date >= from);
+  const hasMeasures = sorted.some((b) => METRICS.some((m) => b[m.key] != null));
   const metricPoints: Point[] = sorted
     .filter((b) => b[metric] != null && b.date >= from)
     .map((b) => ({ date: b.date, value: lOut(s, b[metric]!) }));
@@ -52,37 +53,34 @@ export function Progress({ action, clearAction }: { action?: string; clearAction
   const lastW = allWeights[allWeights.length - 1];
   const spanDays = weights.length >= 2 ? diffDays(weights[weights.length - 1].date, weights[0].date) : 0;
   const trend = weights.length >= 3 && spanDays >= 14 ? linearTrend(weights) : null;
-  const goalPace = wOut(s, s.goals.weeklyLossKg);
+  const history = [...sorted].reverse();
 
   return (
     <div className="page">
       <header className="page-head">
         <h1>Прогресс</h1>
-        <p className="muted">Вес и замеры</p>
       </header>
 
-      <div className="row-actions start">
-        <button type="button" className="btn btn-primary" onClick={() => setEditing(newBody())}>
-          + Новая запись
-        </button>
-      </div>
-
-      <div className="grid">
-        <Card title="Текущий вес">
-          <div className="big">{lastW ? `${fmt(lastW.value)} ${wUnit(s)}` : '—'}</div>
-          <p className="muted">{lastW ? formatDate(lastW.date) : 'нет записей'}</p>
-        </Card>
-        <Card title="С первой записи">
-          <div className="big">{firstW && lastW && allWeights.length > 1 ? signed(lastW.value - firstW.value, wUnit(s)) : '—'}</div>
-          <p className="muted">{firstW && allWeights.length > 1 ? `с ${formatDate(firstW.date)}` : 'нужно минимум 2 записи'}</p>
-        </Card>
-        <Card title="Средний темп за период">
-          <div className="big">{trend ? signed(trend.slope * 7, `${wUnit(s)}/нед.`) : '—'}</div>
-          <p className="muted">
-            {trend ? `по линии тренда · ориентир −${fmt(goalPace)} ${wUnit(s)}/нед.` : 'нужно ≥ 3 записей за ≥ 2 недели'}
+      <Card>
+        <div className="two">
+          <div>
+            <p className="muted small">Сейчас</p>
+            <div className="big">{lastW ? `${fmt(lastW.value)} ${wUnit(s)}` : '—'}</div>
+          </div>
+          <div>
+            <p className="muted small">{firstW && allWeights.length > 1 ? `С ${formatDate(firstW.date)}` : 'Изменение'}</p>
+            <div className="big">{firstW && lastW && allWeights.length > 1 ? signed(lastW.value - firstW.value, wUnit(s)) : '—'}</div>
+          </div>
+        </div>
+        {trend && (
+          <p className="muted small">
+            Средний темп за период: <strong>{signed(trend.slope * 7, `${wUnit(s)}/нед.`)}</strong> (ориентир: −{fmt(wOut(s, s.goals.weeklyLossKg))} {wUnit(s)}/нед.)
           </p>
-        </Card>
-      </div>
+        )}
+        <button type="button" className="btn btn-primary" onClick={() => setEditing(newBody())}>
+          + Записать вес или замеры
+        </button>
+      </Card>
 
       <Card
         title="График веса"
@@ -99,98 +97,66 @@ export function Progress({ action, clearAction }: { action?: string; clearAction
         {weights.length ? (
           <>
             <LineChart points={weights} unit={wUnit(s)} label="Вес" />
-            <p className="muted small">
-              Вес колеблется изо дня в день из‑за воды, соли и еды — это нормально и не означает набор жира. Смотрите на линию тренда за
-              несколько недель. Темп — ориентир, а не медицинская норма.
-            </p>
+            <p className="muted small">Вес скачет изо дня в день из‑за воды и еды — это нормально. Смотрите на пунктирную линию тренда.</p>
           </>
         ) : (
-          <Empty icon="📉">{allWeights.length ? 'За выбранный период записей нет — выберите период длиннее.' : 'Добавьте первую запись веса, чтобы увидеть график.'}</Empty>
+          <Empty icon="📉">{allWeights.length ? 'За этот период записей нет.' : 'Запишите вес — здесь появится график.'}</Empty>
         )}
       </Card>
 
-      <Card
-        title="Замеры"
-        action={
-          <label className="inline-select">
-            <span className="sr-only">Замер</span>
-            <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)}>
-              {METRICS.map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        }
-      >
-        {metricPoints.length ? (
-          <LineChart points={metricPoints} unit={lUnit(s)} label={METRICS.find((m) => m.key === metric)!.label} />
-        ) : (
-          <Empty icon="📏">Замеров «{METRICS.find((m) => m.key === metric)!.label.toLowerCase()}» за период нет. Замеры необязательны.</Empty>
-        )}
-      </Card>
-
-      <Card title="История записей">
-        {sorted.length ? (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th scope="col">Дата</th>
-                  <th scope="col">Вес</th>
-                  {METRICS.map((m) => (
-                    <th key={m.key} scope="col">
-                      {m.label}
-                    </th>
-                  ))}
-                  <th scope="col">
-                    <span className="sr-only">Действия</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...sorted].reverse().map((b) => (
-                  <tr key={b.id}>
-                    <td>
-                      {formatDate(b.date)}
-                      {b.note && <div className="muted small">{b.note}</div>}
-                    </td>
-                    <td>{fmtW(s, b.weight)}</td>
-                    {METRICS.map((m) => (
-                      <td key={m.key}>{fmtL(s, b[m.key])}</td>
-                    ))}
-                    <td className="nowrap">
-                      <button type="button" className="icon-btn small" aria-label={`Изменить запись от ${formatDate(b.date)}`} onClick={() => setEditing(b)}>
-                        ✎
-                      </button>
-                      <button type="button" className="icon-btn small danger" aria-label={`Удалить запись от ${formatDate(b.date)}`} onClick={() => setToDelete(b)}>
-                        🗑
-                      </button>
-                    </td>
-                  </tr>
+      {hasMeasures && (
+        <Card
+          title="Замеры"
+          action={
+            <label className="inline-select">
+              <span className="sr-only">Замер</span>
+              <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)}>
+                {METRICS.map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.label}
+                  </option>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <Empty icon="🗒️">Записей пока нет.</Empty>
-        )}
-      </Card>
+              </select>
+            </label>
+          }
+        >
+          {metricPoints.length ? (
+            <LineChart points={metricPoints} unit={lUnit(s)} label={METRICS.find((m) => m.key === metric)!.label} />
+          ) : (
+            <p className="muted">Нет записей за этот период.</p>
+          )}
+        </Card>
+      )}
+
+      {history.length > 0 && (
+        <Card title="Записи">
+          <ul className="list">
+            {(showAll ? history : history.slice(0, 7)).map((b) => {
+              const extra = METRICS.filter((m) => b[m.key] != null).map((m) => `${m.label.toLowerCase()} ${fmtL(s, b[m.key])}`);
+              return (
+                <li key={b.id}>
+                  <button type="button" className="history-row" onClick={() => setEditing(b)}>
+                    <span>
+                      {formatDate(b.date)}
+                      {(extra.length > 0 || b.note) && <span className="muted small block">{[...extra, b.note].filter(Boolean).join(' · ')}</span>}
+                    </span>
+                    <strong>{fmtW(s, b.weight)}</strong>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {history.length > 7 && (
+            <button type="button" className="link start" onClick={() => setShowAll(!showAll)}>
+              {showAll ? 'Свернуть' : `Показать все (${history.length})`}
+            </button>
+          )}
+        </Card>
+      )}
 
       <Modal open={!!editing} title={editing && data.body.some((b) => b.id === editing.id) ? 'Изменить запись' : 'Новая запись'} onClose={() => setEditing(null)}>
-        {editing && <BodyForm entry={editing} onDone={() => setEditing(null)} />}
+        {editing && <BodyForm entry={editing} isNew={!data.body.some((b) => b.id === editing.id)} onDone={() => setEditing(null)} />}
       </Modal>
-      <ConfirmDialog
-        open={!!toDelete}
-        title="Удалить запись?"
-        text={toDelete ? `Запись от ${formatDate(toDelete.date)} будет удалена.` : ''}
-        onCancel={() => setToDelete(null)}
-        onConfirm={() => {
-          if (toDelete) deleteBody(toDelete.id);
-          setToDelete(null);
-        }}
-      />
     </div>
   );
 }
@@ -204,7 +170,7 @@ function newBody(): BodyEntry {
   return { id: uid(), date: todayISO(), weight: null, waist: null, belly: null, chest: null, hips: null, note: '' };
 }
 
-function BodyForm({ entry, onDone }: { entry: BodyEntry; onDone: () => void }) {
+function BodyForm({ entry, isNew, onDone }: { entry: BodyEntry; isNew: boolean; onDone: () => void }) {
   const data = useData();
   const s = data.settings;
   const toStr = (v: number | null, conv: (x: number) => number) => (v != null ? String(+conv(v).toFixed(1)) : '');
@@ -266,7 +232,7 @@ function BodyForm({ entry, onDone }: { entry: BodyEntry; onDone: () => void }) {
           {(p) => <input {...p} inputMode="decimal" autoFocus value={vals.weight} onChange={(e) => setVals({ ...vals, weight: e.target.value })} />}
         </Field>
       </div>
-      <p className="muted small">Замеры необязательны, {lUnit(s)}:</p>
+      <p className="muted small">Замеры — по желанию, {lUnit(s)}:</p>
       <div className="two">
         {METRICS.map((m) => (
           <Field key={m.key} label={m.label} error={err[m.key]}>
@@ -277,6 +243,21 @@ function BodyForm({ entry, onDone }: { entry: BodyEntry; onDone: () => void }) {
       <Field label="Заметка">{(p) => <textarea {...p} rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="например, утром натощак" />}</Field>
       {Object.keys(err).length > 0 && <Notice tone="danger">Исправьте отмеченные поля.</Notice>}
       <div className="row-actions">
+        {!isNew && (
+          <button
+            type="button"
+            className="btn btn-ghost danger"
+            onClick={() => {
+              if (window.confirm(`Удалить запись от ${formatDate(entry.date)}?`)) {
+                deleteBody(entry.id);
+                onDone();
+              }
+            }}
+          >
+            Удалить
+          </button>
+        )}
+        <span className="spacer" />
         <button type="button" className="btn" onClick={onDone}>
           Отмена
         </button>
